@@ -25,4 +25,4 @@ The balance equations are made such that
 export is used
 4. If import or export limits are hit we get a shortage or an excess of power.
 
-
+![screenshot](https://github.com/beow/EnergyBalance/blob/main/300TWhWind.png)
