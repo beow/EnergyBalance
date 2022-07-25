@@ -98,7 +98,7 @@ def info():
     print(df.info())
     
 def balance():
-    df.loc[0,'Store'] = 20000                                                  # Initiate columns 
+    df.loc[0,'Store'] = 20000                                                  # Initiate columns
     df.loc[0,'Pout'] = df.loc[0,'Tout']
     df.loc[0,'Waout'] = 0    #df.loc[0,'Wabase']
     df.loc[0,'Import'] = 0
