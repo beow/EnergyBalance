@@ -71,6 +71,7 @@ for adding H2 to the store when we have excess power and burning H2 in a gas
 turbine to produce power when there is a shortage of power, in order to keep
 the total power output on the target level. 
     
+Version: 1.0.1, 2022-07-25
 
 @author: Bengt J. Olsson
 """
@@ -220,8 +221,8 @@ print("Inflow per year:      {:> 10.2f} TWh".format(df['Inflow'].sum() / 1000 / 
 print("Produced water per year:{:> 8.2f} TWh".format(df['Waout'].sum() / 1000 / 2))
 print("Produced wind per year:{:> 9.2f} TWh".format(df['Wind'].sum() / 1000 / 2))
 print("Produced const per year:{:> 8.2f} TWh".format(df['Nuclear'].sum() / 1000 / 2))
-print("Max residual load:    {:> 10.2f} GW".format(df['Residual'].max()))
-print("Max overshot          {:> 10.2f} GW".format(-df['Residual'].min()))
+print("Max shortage:         {:> 10.2f} GW".format(-df['Residual'].min()))
+print("Max overshot          {:> 10.2f} GW".format(df['Residual'].max()))
 print("Water store balance   {:> 10.2f} TWh".format((df.loc[len(df)-1,'Store'] - df.loc[0,'Store'])/1000)) 
 print("Import per year       {:> 10.2f} TWh".format(df['Import'].sum() / 2 / 1000))
 print("Export per year       {:> 10.2f} TWh".format((df['Export'].sum() / 2 + constexp * 365.5 * 24) / 1000))
