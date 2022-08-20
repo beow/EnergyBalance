@@ -71,7 +71,7 @@ for adding H2 to the store when we have excess power and burning H2 in a gas
 turbine to produce power when there is a shortage of power, in order to keep
 the total power output on the target level. 
     
-Version: 1.0.1, 2022-07-25
+Version: 1.0.2, 2022-07-26
 
 @author: Bengt J. Olsson
 """
@@ -98,10 +98,10 @@ def normalize():
 def info():
     print(df.info())
     
-def balance():
-    df.loc[0,'Store'] = 20000                                                  # Initiate columns
-    df.loc[0,'Pout'] = df.loc[0,'Tout']
-    df.loc[0,'Waout'] = 0    #df.loc[0,'Wabase']
+def balance():                                                                 # Initiate columns
+    df.loc[0,'Store'] = 20000                                                  # Water store (GWh)
+    df.loc[0,'Pout'] = df.loc[0,'Tout']                                        # Total power out
+    df.loc[0,'Waout'] = 0                                                      # Water power out
     df.loc[0,'Import'] = 0
     df.loc[0,'Export'] = 0
     df.loc[0,'Pnet'] = df.loc[0,'Tout'] - constexp
@@ -121,7 +121,8 @@ def balance():
         con =  df.loc[i,'Nuclear']
         inflow = df.loc[i,'Inflow']
         ostore = df.loc[i-1,'Store']                                           # ostore = old store (value of hour before)
-
+#        if i == 8784:
+#            pass
         if load - (wind + con) <= 0:                                           # Water balance equations
             water = 2                                                          # Minimum water power production
         elif load - (wind + con) >= wlim:
@@ -164,25 +165,17 @@ def inflow():
     
 def scalewind():
     df['Wind'] *= scale
-
-def estore():
-    df.loc[0,'Estore'] = 0
-    for i in range(1,len(df)):
-        df.loc[i,'Estore'] = df.loc[i-1,'Estore'] + df.loc[i,'Wind'] - mean_power
-    df.plot(x ='Date', y='Estore',figsize=(30,20))
-#    df.plot(x ='Date', y='Wind',figsize=(30,20))
-    sys.exit()
     
 ### Start main ###
 
 # Windpower scaling
-scale = 6
+scale = 1
 # Mean nuclear + heat power
 conp = 7.2 # +  3.14 * (6 - scale)                                             # Constant power sources [GW]
 # Water power limit
 wlim = 13
 # import/export limits
-constexp = 4                                                                   # Constant export (added to consumtion for tout)
+constexp = 4                                                                  # Constant export (added to consumtion for tout)
 impl = 6
 expl = 10 - constexp
 # Load curve (usage)
@@ -197,7 +190,6 @@ inflow()                                                                       #
 scalewind()                                                                    # Scale windstrengths
 total_power = df['Wind'].sum()
 mean_power = total_power / len(df)
-#estore()                                                                            
 balance()                                                                      # Calculate balance equations
 
 df['Residual'] = df['Pout'] - df['Tout']                                       # Hydrogen etc. calculations
@@ -205,16 +197,24 @@ curtail = 0
 shortage = 0
 df.loc[0,'Hydrogen'] = 0                                                       # Hydrogen store in kton H2
 df.loc[0,'eStore'] = 0                                                         # Energy store in GWh
+H2out = 0
+elyscap = 15                                                        
 for i in range(1,len(df)):
     df.loc[i,'eStore'] = df.loc[i-1,'eStore'] + df.loc[i,'Residual']
     if df.loc[i,'Residual'] >= 0:
         curtail += df.loc[i,'Residual']
-        df.loc[i,'Hydrogen'] = df.loc[i-1,'Hydrogen'] + 0.02 * df.loc[i,'Residual']
+        df.loc[i,'Hydrogen'] = df.loc[i-1,'Hydrogen'] + 0.02 * min(df.loc[i,'Residual'], elyscap)
+#        H2out += 0.02 * df.loc[i,'Residual']
     else:
         shortage -= df.loc[i,'Residual']
         df.loc[i,'Hydrogen'] = df.loc[i-1,'Hydrogen'] + 0.05 * df.loc[i,'Residual']
-            
-print("/n")
+        H2out -= 0.05 * df.loc[i,'Residual']
+h2min = df['Hydrogen'].min()
+df['Hydrogen'] -= h2min
+H2mean = df['Hydrogen'].mean()
+H2turnover = H2out/H2mean
+
+print("\n")
 print("Prod pow + imp per year:{:> 8.2f} TWh".format(df['Pnet'].sum() / 1000 / 2))
 print("Load + export per year:{:> 9.2f} TWh".format(load * 365.5 * 24 / 1000+df['Export'].sum() / 1000 / 2))
 print("Inflow per year:      {:> 10.2f} TWh".format(df['Inflow'].sum() / 1000 / 2))
@@ -228,6 +228,7 @@ print("Import per year       {:> 10.2f} TWh".format(df['Import'].sum() / 2 / 100
 print("Export per year       {:> 10.2f} TWh".format((df['Export'].sum() / 2 + constexp * 365.5 * 24) / 1000))
 print("Curtailed per year    {:> 10.2f} TWh".format(curtail / 2 / 1000))
 print("Shortage per year     {:> 10.2f} TWh".format(shortage / 2 / 1000))
+#print("H2 energy out         {:> 10.2f} TWh".format(H2out*20/1000))
 # df.plot(x ='Date', y='Store',figsize=(30,20))
 #df.plot(x ='Date', y=['Pout'],figsize=(15,10))
 #df.plot(x ='Date', y='Wabase')
@@ -235,19 +236,22 @@ print("Shortage per year     {:> 10.2f} TWh".format(shortage / 2 / 1000))
 df.plot(x ='Date', y='Store', ylabel='[GWh]',figsize=(15,10))
 #df.plot(x ='Date', y='Residual', ylabel='[GWh]',figsize=(15,10))
 df.plot(x ='Date', y='Hydrogen', ylabel='[kton H2]',figsize=(15,10))
-df.plot(x ='Date', y='eStore', ylabel='[GWh]',figsize=(15,10))
 # df.plot(x ='Date', y='Pout',figsize=(15,10))
 # df.plot(x ='Date', y=['Import'],figsize=(15,10))
 # df.plot(x ='Date', y=['Export'],figsize=(15,10))
 #df.plot(x ='Date', y=['Waout'],figsize=(15,10))
 
 #print(df.tail(100))
+start = "2020-01-01"
+stop = "2021-12-31"
 year = 2021
 df.loc[df['Date'].dt.year == year ].plot(x ='Date', y='Waout', ylabel='[GW]', figsize=(15,10))
 #df.loc[df['Date'].dt.year == year ].plot(x ='Date', y='Store',figsize=(15,10))
 #df.loc[df['Date'].dt.year == year ].plot(x ='Date', y=['Import','Export'], ylabel='[GW]', figsize=(15,10))
 #df.loc[df['Date'].dt.year == year ].plot(x ='Date', y='Pnet',figsize=(15,10))
-df.loc[df['Date'].dt.year == year ].plot(x ='Date', y=['Pout','Wind','Nuclear','Waout','Import','Export'], ylabel='[GW]', ylim = [0,70], figsize=(15,10))
+#df.loc[df['Date'].dt.year == year].plot(x ='Date', y=['Pout','Wind','Nuclear','Waout','Import','Export'], ylabel='[GW]', ylim = [0,70], figsize=(15,10))
+df.loc[(df['Date'] >= start) & (df['Date'] <= stop)].plot(x ='Date', y=['Pout','Wind','Nuclear','Waout','Import','Export'], ylabel='[GW]', figsize=(15,10)) # ylim = [0,70], 
+df.loc[(df['Date'] >= start) & (df['Date'] <= stop)].plot(x ='Date', y=['eStore'], ylabel='[GWh]',figsize=(15,10))
 #df.loc[df['Date'].dt.year == year ].plot(x ='Date', y='Inflow',figsize=(15,10))
 # print("\nImport {}      {:> 10.2f} TWh".format(year, df.loc[df['Date'].dt.year == year, 'Import'].sum() / 1000))
 # print("Export {}        {:> 10.2f} TWh".format(year, df.loc[df['Date'].dt.year == year, 'Export'].sum() / 1000))
