@@ -25,4 +25,14 @@ The balance equations are made such that
 export is used
 4. If import or export limits are hit we get a shortage or an excess of power.
 
+Scenario files:
+* SEpresent.py
+  Model of present situation (2020-2021)
+* SE300wind.py
+  Adding about 140 TWh wind power to present system to achieve roughly 300 TWh total production
+* SE300windH2.py
+  As previous but with production/consumption of green hydrogen to cover the deficits in production.
+* SE300nuc.py
+  Instead of wind power, adding about 140 TWh of nuclear energy to get to the same 300 TWh production.
+
 ![screenshot](https://github.com/beow/EnergyBalance/blob/main/300TWhWind.png)
