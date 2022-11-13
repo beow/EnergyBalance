@@ -1,9 +1,10 @@
 # EnergyBalance
 An energy balance model for Sweden
 
-Modelling Sweden in terms of electric energy balance during 2020 - 2021. From
-this extrapolations in terms of adding more wind or nuclear energy can be
-explored. The model assumes the following
+Modelling Sweden in terms of electric energy/power balance. Using windpower
+data from 2020-2021 that may be scaled linearly to a requested level. Other
+"must run" sources (heat, nuclear) are modelled with a sinus variation over
+the year. Hydrogen production with flexibility is also included. 
 
 Balance:
     Consumption + Export = Production + Import
@@ -12,27 +13,20 @@ get either a shortage or excess of power.
 
 Hourly data:
 The simulation is based on hourly data during 2020-2021. A dataframe is
-constructed with columns for Consumtion+Export, Constant (nuclear + heat,
-based), Water inflow/outflow, Import/Export, Hydrogen need plus some other
+constructed with columns for Consumption, Wind, Water, Constant (nuclear + 
+heat), Import/Export, Hydrogen production/flex plus some other
 parameters. All per hour. Power/Energy in GW (for one hour => GWh).
 
-Power dispatch:
-The balance equations are made such that
-1. Consumtion (+ Export), Constant power and Wind power are given (that is,
-"dispatched" first)
+Power dispatch to match Consumtion is done with the following "merit order":
+1. Wind and Constant (heat/nuclear) power are "must run" sources 
 2. Water (hydro) power is used to balance production against consumption
-3. If water capacity is not large or small enough for balancing, import or
-export is used
-4. If import or export limits are hit we get a shortage or an excess of power.
+3. If not balancing, extra hydrogen production or flex
+4. If not balancing, Import or Export
+5. If not balancing, Shortage or Excess of power.
 
 Scenario files:
-* SEpresent.py
-  Model of present situation (2020-2021)
-* SE300wind.py
-  Adding about 140 TWh wind power to present system to achieve roughly 300 TWh total production
-* SE300windH2.py
-  As previous but with production/consumption of green hydrogen to cover the deficits in production.
-* SE300nuc.py
-  Instead of wind power, adding about 140 TWh of nuclear energy to get to the same 300 TWh production.
+SvK_EF_wind.py, models the SvK "Elecrification Renewable" scenario with 
+mainly windpower (no nuclear).
+SvK_EF_nuclear.py, models the same scenario but with mainly nuclear power.
 
 ![screenshot](https://github.com/beow/EnergyBalance/blob/main/300TWhWind.png)
