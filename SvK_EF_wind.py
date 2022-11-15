@@ -1,10 +1,32 @@
 # -*- coding: utf-8 -*-
 """
+--- License notice ---
+Copyright (c) 2022 Bengt J. Olsson
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+---
+
 Created on Sun Jun 19 19:48:34 2022
 
-Modelling Sweden in terms of electric energy balance during 2020 - 2021. From
-this extrapolations in terms of adding more wind or Heat energy can be
-explored. The model assumes the following
+Modelling Sweden in terms of electric energy balance using wind data from 
+2020 - 2021. From this extrapolations in terms of adding more wind or Heat
+energy can be explored. The model assumes the following
 
 Balance:
     Consumption + Export = Production + Import
@@ -43,7 +65,7 @@ is an ideal store of produced H2. Energy flows into it at production rates and
 energy is drained at rate corresponding to the mean production. 
 
                                                            
-Version: 2.0, 2022-11-13 
+Version: 2.0.1, 2022-11-15
 
 Disclaimer: Script code could need a clean-up...
 
@@ -79,7 +101,7 @@ def balance():
     df.loc[0,'Import'] = 0
     df.loc[0,'Export'] = 0
     df.loc[0,'Residual'] = 0
-    df.loc[0,'Pnet'] = df.loc[0,'Consumption'] - constexp
+    df.loc[0,'Pnet'] = df.loc[0,'Consumption']
     for i in range(1, len(df)):                                                # Start of the hourly power balancing
         imp = 0
         exp = 0
@@ -90,11 +112,11 @@ def balance():
         load =  df.loc[i,'Consumption']
         con =  df.loc[i,'Heat']
         if (wind + con) - load  >= 0:                                          # Water balance equations
-            water = 2                                                          
-        elif (wind + con) - load  <= -wlim:
-            water = wlim
+            water = wlim_low                                                          
+        elif (wind + con) - load  <= -wlim_high:
+            water = wlim_high
         else:
-            water = max(load - (wind + con),2)
+            water = max(load - (wind + con),wlim_low)
             
         if (wind + con + water) - load <= 0:                                   # H2 flex and import balancing
             flex = min(load - (wind+con+water), flexmax)                                                                   # Imp/exp balance equations
@@ -110,7 +132,7 @@ def balance():
         df.loc[i,'Pout'] = wind + water + con + imp - exp
         df.loc[i,'Pnet'] = wind + water + con + imp
         df.loc[i,'Consumption'] += eload - flex
-        df.loc[i,'eStore'] = df.loc[i-1,'eStore'] + eload + (flexmax - flex) - 9.7
+        df.loc[i,'eStore'] = df.loc[i-1,'eStore'] + eload + (flexmax - flex) - H2drain
         H2high += eload
         H2low += flexmax - flex
         
@@ -126,63 +148,60 @@ def scalewind():
 ### Start main ###
 
 # Windpower scaling
-scale = 8.05                                                       # 4.3: No nuclear power 2045
-# Mean Heat + heat power                                                    # 1.7: No nuclear power 2045. 7.2: same as today
-conp = 1.7 # +  3.14 * (6 - scale)                                       # Constant power sources [GW]
+scale = 8.05                                                                   # Scaling factor relative wind 2020-2021
+# Constant power sources
+conp = 1.7                                                                     # Heat, nuclear [GW]
 # Water power limit
-wlim = 13
-# import/export limits
-constexp = 0                                                                   # Constant export (added to consumtion for tout)
-impl = 2.6                                                                     # 0.70 * 3.7 importkap från norge
-expl = 6 # 10 - constexp
-# Load curve (usage)
-load = 32.25 #22.915  #+ conp + (scale-1)*3.14 + constexp                               # Mean load (note: includes part of export "constexp")
-#load = 35.3  
-elyscap = 9.35
-flexmax = 9.35  
-H2high = 0
-H2low = 0                                                                 # Load 22.9 for 201 TWh
-df = pd.read_csv('WindSE20-21.csv')
+wlim_high = 13                                                                 # Water power upper limit
+wlim_low = 2                                                                   # Water power lower limit
+# Import/Export limits
+impl = 2.6                                                                     # 0.70 * 3.7 Import capacity from Norway
+expl = 6                                                                       # Assumed export capacity
+# Constant load
+load = 32.25                                                                   # Constant load 
+# H2 parameters
+elyscap = 9.35                                                                 # Electrolyser capacity for peak production (flexible)
+flexmax = 9.35                                                                 # Electrolyser capacity for continuos production(flexible)
+total_elyscap = elyscap + flexmax                                                                 
+H2high = 0                                                                     # H2 produced from peak energy
+H2low = 0                                                                      # H2 produced within Conumption profile 
+H2drain = 85/8.76                                                              # eStore drain rate (85 TWh / 8760 h)
+# Start simulation
+df = pd.read_csv('WindSE20-21.csv')                                            # Create dataframe with wind data
 rename_cols(False)
 normalize()
-sinus('Consumption', load, 4, 0*3.14)                                                 # Construct sinus shaped target load
-sinus('Heat', conp, 1.5, 0*3.14)                                              # Construct sinus shaped constant power (nuclear + heat)
+sinus('Consumption', load, 4, 0*3.14)                                          # Construct sinus shaped target load
+sinus('Heat', conp, 1.5, 0*3.14)                                               # Construct sinus shaped constant power (nuclear + heat)
 scalewind()                                                                    # Scale windstrengths
-wind_max = df['Wind'].max()
-total_power = df['Wind'].sum()
-mean_power = total_power / len(df)
 balance()                                                                      # Calculate balance equations
 
-df['Residual'] = df['Pout'] - df['Consumption']
-curtail = df.loc[df['Residual'] > 0, "Residual"].sum()                                      # Hydrogen etc. calculations
-shortage = - df.loc[df['Residual'] < 0, "Residual"].sum()                                      # Hydrogen etc. calculations
+df['Residual'] = df['Pout'] - df['Consumption']                                # Diff between total available power for consumption and the actual consumption
+curtail = df.loc[df['Residual'] > 0, "Residual"].sum()                         # Not used power 
+shortage = - df.loc[df['Residual'] < 0, "Residual"].sum()                      # Power deficit
+total_H2 = H2high + H2low
 
 print("\n")
 print("Prod power per year:        {:> 8.2f} TWh".format(df['Pnet'].sum() / 1000 / 2))
 #print("Load + export per year:{:> 9.2f} TWh".format(load * 365.5 * 24 / 1000+df['Export'].sum() / 1000 / 2))
 print("Load per year:             {:> 9.2f} TWh".format(df['Consumption'].sum() / 1000 / 2))
-#print("Inflow per year:      {:> 10.2f} TWh".format(df['Inflow'].sum() / 1000 / 2))
 print("Produced water per year:    {:> 8.2f} TWh".format(df['Water'].sum() / 1000 / 2))
 print("Produced wind per year:    {:> 9.2f} TWh".format(df['Wind'].sum() / 1000 / 2))
 print("Produced nuc/heat per year: {:> 8.2f} TWh".format(df['Heat'].sum() / 1000 / 2))
-print("H2 production per year:     {:> 8.2f} TWh".format((H2high+H2low) / 1000 / 2))
-print("Cap. util. electrolyzers:   {:> 8.2f} %".format(((H2high+H2low) / 1000 / 2)/((elyscap+flexmax)*8.76/100)))
+print("H2 production per year:     {:> 8.2f} TWh".format((total_H2 / 1000 / 2)))
+print("Cap. util. electrolyzers:   {:> 8.2f} %".format((total_H2 / 1000 / 2)/(total_elyscap*8.76/100)))
 print("Curtailed per year        {:> 10.2f} TWh".format(curtail / 2 / 1000))
-# #print("Curtailed per year (H2){:> 9.2f} TWh".format(curtail / 2 / 1000))
 print("Shortage per year            {:> 7.3f} TWh".format(shortage / 2 / 1000))
 print("Max shortage:             {:> 10.2f} GW".format(-df['Residual'].min()))
 print("Max overshot              {:> 10.2f} GW".format(df['Residual'].max()))
-#print("Water store balance   {:> 10.2f} TWh".format((df.loc[len(df)-1,'Store'] - df.loc[0,'Store'])/1000)) 
 print("Import per year           {:> 10.2f} TWh".format(df['Import'].sum() / 2 / 1000))
-print("Export per year           {:> 10.2f} TWh".format((df['Export'].sum() / 2 + constexp * 365.5 * 24) / 1000))
+print("Export per year           {:> 10.2f} TWh".format(df['Export'].sum() / 2 / 1000))
 
 start = "2020-01-01"
 stop = "2021-12-31"
 df.loc[(df['Date'] >= start) & (df['Date'] <= stop)].plot(x ='Date', y=['Pout','Wind','Heat','Water','Import','Export','Consumption'], ylabel='[GW]', figsize=(15,10)) # ylim = [0,70], 
 #df.loc[(df['Date'] >= start) & (df['Date'] <= stop)].plot(x ='Date', y=['Import','Export'], ylabel='[GW]', figsize=(15,10)) # ylim = [0,70], 
-# df.loc[(df['Date'] >= start) & (df['Date'] <= stop)].plot(x ='Date', y=['Water'], ylabel='[GWh]',figsize=(15,10))
-# df.loc[(df['Date'] >= start) & (df['Date'] <= stop)].plot(x ='Date', y=['Store'], ylabel='[GWh]',figsize=(15,10))
-df.loc[(df['Date'] >= start) & (df['Date'] <= stop)].plot(x ='Date', y=['eStore'], ylabel='[GWh]',figsize=(15,10))
+#df.loc[(df['Date'] >= start) & (df['Date'] <= stop)].plot(x ='Date', y=['Water'], ylabel='[GWh]',figsize=(15,10))
+#df.loc[(df['Date'] >= start) & (df['Date'] <= stop)].plot(x ='Date', y=['eStore'], ylabel='[GWh]',figsize=(15,10))
 df.loc[(df['Date'] >= start) & (df['Date'] <= stop)].plot(x ='Date', y=['Residual'], ylabel='[GWh]',figsize=(15,10))
 
 
