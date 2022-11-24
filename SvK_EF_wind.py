@@ -95,8 +95,10 @@ def info():
     print(df.info())
     
 def balance():
-    global H2high, H2low                                                       # Initiate columns
+    global H2high, H2low                                                       #
     df.loc[0,'eStore'] = 0                                                     # H2 production store
+    df.loc[0,'dStore'] = 0                                                     # Deficit store
+    df.loc[0,'dPower'] = 0
     df.loc[0,'Pout'] = df.loc[0,'Consumption']                              
     df.loc[0,'Import'] = 0
     df.loc[0,'Export'] = 0
@@ -123,21 +125,32 @@ def balance():
         power_diff = must_run + water - load                                   # Power balance after water balancing
 
         if power_diff >= 0:                                                    # If excess power after water balancing
+            def_store = min(power_diff,dStore_InCap)                           # First add to deficit store
+            power_diff -= def_store                                            # New power balance
             eload = min(power_diff,elyscap)                                    # Produce H2 up to electrolyser cap limit
             power_diff -= eload                                                # New power balance
             exp = min(power_diff, expl)                                        # Export whatever is left, up to export limit            
+
         else:                                                                  # If power deficit after water balancing
             flex = min(-power_diff , flexmax)                                  # Decrease H2 production
             power_diff += flex                                                 # New power balance
             imp = min(-power_diff, impl)                                       # Import to cover deficit 
+            power_diff += imp                                                 # New power balance
+            def_store = -min(-power_diff,dStore_OutCap)                        # Extract from deficit store
+            # power_diff += -def_store                                         # New power balance
         
         df.loc[i,'Water'] = water
         df.loc[i,'Import'] = imp 
         df.loc[i,'Export'] = exp
-        df.loc[i,'Pout'] = must_run + water + imp - exp
+        df.loc[i,'Pout'] = must_run + water + imp - exp - def_store
         df.loc[i,'Pnet'] = must_run + water + imp
         df.loc[i,'Consumption'] += eload - flex
         df.loc[i,'eStore'] = df.loc[i-1,'eStore'] + eload + (flexmax - flex) - H2drain
+        if def_store < 0:
+            def_store /= rtp_eff
+        df.loc[i,'dStore'] = df.loc[i-1,'dStore'] + def_store
+        df.loc[i,'dPower'] = def_store
+
         H2high += eload
         H2low += flexmax - flex
         
@@ -164,6 +177,14 @@ impl = 2.6                                                                     #
 expl = 6                                                                       # Assumed export capacity
 # Constant load
 load = 32.25                                                                   # Constant load 
+# Deficit store parameters
+dStore_InCap = 0.36                                                            # Capacity in to deficit store (for example pump power in pumped hydro store)
+dStore_OutCap = 6                                                              # Capacity out from deficit store (for example generator power in pumped hydro store)
+rtp_eff = 0.8                                                                  # Round trip efficiency energy store
+                                                                               # Params for different efficiencies:
+                                                                               # dStore_inCap, dStore_OutCap, rtp,eff
+                                                                                 # Hydrogen: 0,73, 6, 0.4
+                                                                                 # Pumped hydro: 0.36, 6, 0.8
 # H2 parameters
 elyscap = 9.35                                                                 # Electrolyser capacity for peak production (flexible)
 flexmax = 9.35                                                                 # Electrolyser capacity for continuos production(flexible)
@@ -205,10 +226,11 @@ print("Export per year           {:> 10.2f} TWh".format(df['Export'].sum() / 2 /
 
 start = "2020-01-01"
 stop = "2021-12-31"
-df.loc[(df['Date'] >= start) & (df['Date'] <= stop)].plot(x ='Date', y=['Pout','Wind','Heat','Water','Import','Export','Consumption'], ylabel='[GW]', figsize=(15,10)) # ylim = [0,70], 
+df.loc[(df['Date'] >= start) & (df['Date'] <= stop)].plot(x ='Date', y=['Pout','Wind','Heat','Water','Import','Export','Consumption','dPower'], ylabel='[GW]', figsize=(15,10)) # ylim = [0,70], 
 #df.loc[(df['Date'] >= start) & (df['Date'] <= stop)].plot(x ='Date', y=['Import','Export'], ylabel='[GW]', figsize=(15,10)) # ylim = [0,70], 
 #df.loc[(df['Date'] >= start) & (df['Date'] <= stop)].plot(x ='Date', y=['Water'], ylabel='[GWh]',figsize=(15,10))
-df.loc[(df['Date'] >= start) & (df['Date'] <= stop)].plot(x ='Date', y=['eStore'], ylabel='[GWh]',figsize=(15,10))
+# df.loc[(df['Date'] >= start) & (df['Date'] <= stop)].plot(x ='Date', y=['eStore'], ylabel='[GWh]',figsize=(15,10))
+df.loc[(df['Date'] >= start) & (df['Date'] <= stop)].plot(x ='Date', y=['dStore'], ylabel='[GWh]',figsize=(15,10))
 #df.loc[(df['Date'] >= start) & (df['Date'] <= stop)].plot(x ='Date', y=['Residual'], ylabel='[GWh]',figsize=(15,10))
 
 
