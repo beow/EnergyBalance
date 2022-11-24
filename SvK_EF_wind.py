@@ -96,7 +96,7 @@ def info():
     
 def balance():
     global H2high, H2low                                                       # Initiate columns
-    df.loc[0,'eStore'] = 0                                                  
+    df.loc[0,'eStore'] = 0                                                     # H2 production store
     df.loc[0,'Pout'] = df.loc[0,'Consumption']                              
     df.loc[0,'Import'] = 0
     df.loc[0,'Export'] = 0
@@ -108,29 +108,34 @@ def balance():
         water = 0
         eload = 0
         flex = 0
-        wind = df.loc[i,'Wind']                                                     
+        power_diff = 0
+        def_store = 0
+        must_run = df.loc[i,'Wind'] + df.loc[i,'Heat']                         # must run sources with defined power production                                                     
         load =  df.loc[i,'Consumption']
-        con =  df.loc[i,'Heat']
-        if (wind + con) - load  >= 0:                                          # Water balance equations
+
+        if must_run - load  >= 0:                                              # Water balance equations
             water = wlim_low                                                          
-        elif (wind + con) - load  <= -wlim_high:
+        elif must_run - load  <= -wlim_high:
             water = wlim_high
         else:
-            water = max(load - (wind + con),wlim_low)
+            water = max(load - must_run,wlim_low)
             
-        if (wind + con + water) - load <= 0:                                   # H2 flex and import balancing
-            flex = min(load - (wind+con+water), flexmax)                                                                   # Imp/exp balance equations
-            imp = min(load - (wind + con + water)- flex, impl)
-        else:                                                                  # H2 flex and export balancing
-            eload = min((wind + con + water) - load,elyscap)                   
-            exp = min((wind + con + water) - load - eload, expl)               # --- End balancing
+        power_diff = must_run + water - load                                   # Power balance after water balancing
 
+        if power_diff >= 0:                                                    # If excess power after water balancing
+            eload = min(power_diff,elyscap)                                    # Produce H2 up to electrolyser cap limit
+            power_diff -= eload                                                # New power balance
+            exp = min(power_diff, expl)                                        # Export whatever is left, up to export limit            
+        else:                                                                  # If power deficit after water balancing
+            flex = min(-power_diff , flexmax)                                  # Decrease H2 production
+            power_diff += flex                                                 # New power balance
+            imp = min(-power_diff, impl)                                       # Import to cover deficit 
         
         df.loc[i,'Water'] = water
         df.loc[i,'Import'] = imp 
         df.loc[i,'Export'] = exp
-        df.loc[i,'Pout'] = wind + water + con + imp - exp
-        df.loc[i,'Pnet'] = wind + water + con + imp
+        df.loc[i,'Pout'] = must_run + water + imp - exp
+        df.loc[i,'Pnet'] = must_run + water + imp
         df.loc[i,'Consumption'] += eload - flex
         df.loc[i,'eStore'] = df.loc[i-1,'eStore'] + eload + (flexmax - flex) - H2drain
         H2high += eload
@@ -203,8 +208,8 @@ stop = "2021-12-31"
 df.loc[(df['Date'] >= start) & (df['Date'] <= stop)].plot(x ='Date', y=['Pout','Wind','Heat','Water','Import','Export','Consumption'], ylabel='[GW]', figsize=(15,10)) # ylim = [0,70], 
 #df.loc[(df['Date'] >= start) & (df['Date'] <= stop)].plot(x ='Date', y=['Import','Export'], ylabel='[GW]', figsize=(15,10)) # ylim = [0,70], 
 #df.loc[(df['Date'] >= start) & (df['Date'] <= stop)].plot(x ='Date', y=['Water'], ylabel='[GWh]',figsize=(15,10))
-#df.loc[(df['Date'] >= start) & (df['Date'] <= stop)].plot(x ='Date', y=['eStore'], ylabel='[GWh]',figsize=(15,10))
-df.loc[(df['Date'] >= start) & (df['Date'] <= stop)].plot(x ='Date', y=['Residual'], ylabel='[GWh]',figsize=(15,10))
+df.loc[(df['Date'] >= start) & (df['Date'] <= stop)].plot(x ='Date', y=['eStore'], ylabel='[GWh]',figsize=(15,10))
+#df.loc[(df['Date'] >= start) & (df['Date'] <= stop)].plot(x ='Date', y=['Residual'], ylabel='[GWh]',figsize=(15,10))
 
 
 # Vindkraftstatistik hela landet
