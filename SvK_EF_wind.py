@@ -64,8 +64,14 @@ Hydrogen production is handled in terms of energy needed to produce it. "eStore"
 is an ideal store of produced H2. Energy flows into it at production rates and
 energy is drained at rate corresponding to the mean production. 
 
+A balance energy store functionality is included to simulate the size of a
+store needed to cover the deficit that may appear when having a large share
+of wind power.
+
+See https://adelsfors.se/2022/11/18/a-simple-balance-model-for-swedens-electricity-power-system/
+for a description of the model.
                                                            
-Version: 2.0.1, 2022-11-15
+Version: 2.1.0, 2022-11-25
 
 Disclaimer: Script code could need a clean-up...
 
@@ -178,9 +184,9 @@ expl = 6                                                                       #
 # Constant load
 load = 32.25                                                                   # Constant load 
 # Deficit store parameters
-dStore_InCap = 0.36                                                            # Capacity in to deficit store (for example pump power in pumped hydro store)
+dStore_InCap = 0.73                                                            # Capacity in to deficit store (for example pump power in pumped hydro store)
 dStore_OutCap = 6                                                              # Capacity out from deficit store (for example generator power in pumped hydro store)
-rtp_eff = 0.8                                                                  # Round trip efficiency energy store
+rtp_eff = 0.4                                                                  # Round trip efficiency energy store
                                                                                # Params for different efficiencies:
                                                                                # dStore_inCap, dStore_OutCap, rtp,eff
                                                                                  # Hydrogen: 0,73, 6, 0.4
@@ -226,7 +232,7 @@ print("Export per year           {:> 10.2f} TWh".format(df['Export'].sum() / 2 /
 
 start = "2020-01-01"
 stop = "2021-12-31"
-df.loc[(df['Date'] >= start) & (df['Date'] <= stop)].plot(x ='Date', y=['Pout','Wind','Heat','Water','Import','Export','Consumption','dPower'], ylabel='[GW]', figsize=(15,10)) # ylim = [0,70], 
+df.loc[(df['Date'] >= start) & (df['Date'] <= stop)].plot(x ='Date', y=['Pout','Wind','Heat','Water','Import','Export','Consumption'], ylabel='[GW]', figsize=(15,10)) # ylim = [0,70], 
 #df.loc[(df['Date'] >= start) & (df['Date'] <= stop)].plot(x ='Date', y=['Import','Export'], ylabel='[GW]', figsize=(15,10)) # ylim = [0,70], 
 #df.loc[(df['Date'] >= start) & (df['Date'] <= stop)].plot(x ='Date', y=['Water'], ylabel='[GWh]',figsize=(15,10))
 # df.loc[(df['Date'] >= start) & (df['Date'] <= stop)].plot(x ='Date', y=['eStore'], ylabel='[GWh]',figsize=(15,10))
