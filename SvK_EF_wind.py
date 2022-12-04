@@ -152,10 +152,10 @@ def balance():
         df.loc[i,'Pnet'] = must_run + water + imp
         df.loc[i,'Consumption'] += eload - flex
         df.loc[i,'eStore'] = df.loc[i-1,'eStore'] + eload + (flexmax - flex) - H2drain
+        df.loc[i,'dPower'] = -def_store
         if def_store < 0:
             def_store /= rtp_eff
         df.loc[i,'dStore'] = df.loc[i-1,'dStore'] + def_store
-        df.loc[i,'dPower'] = def_store
 
         H2high += eload
         H2low += flexmax - flex
@@ -230,9 +230,9 @@ print("Max overshot              {:> 10.2f} GW".format(df['Residual'].max()))
 print("Import per year           {:> 10.2f} TWh".format(df['Import'].sum() / 2 / 1000))
 print("Export per year           {:> 10.2f} TWh".format(df['Export'].sum() / 2 / 1000))
 
-start = "2020-01-01"
-stop = "2021-12-31"
-df.loc[(df['Date'] >= start) & (df['Date'] <= stop)].plot(x ='Date', y=['Pout','Wind','Heat','Water','Import','Export','Consumption'], ylabel='[GW]', figsize=(15,10)) # ylim = [0,70], 
+start = "2021-01-01"
+stop = "2021-01-31"
+df.loc[(df['Date'] >= start) & (df['Date'] <= stop)].plot(x ='Date', y=['Pout','Wind','Heat','Water','Import','Export','Consumption','dPower'], ylabel='[GW]', figsize=(15,10)) # ylim = [0,70], 
 #df.loc[(df['Date'] >= start) & (df['Date'] <= stop)].plot(x ='Date', y=['Import','Export'], ylabel='[GW]', figsize=(15,10)) # ylim = [0,70], 
 #df.loc[(df['Date'] >= start) & (df['Date'] <= stop)].plot(x ='Date', y=['Water'], ylabel='[GWh]',figsize=(15,10))
 # df.loc[(df['Date'] >= start) & (df['Date'] <= stop)].plot(x ='Date', y=['eStore'], ylabel='[GWh]',figsize=(15,10))
